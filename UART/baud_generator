@@ -1,0 +1,29 @@
+module baud_generator(
+    input clk,
+    input rst,
+    output reg baud_tick
+);
+
+parameter CLK_FREQ = 100_000_000;   // 100 MHz
+parameter BAUD_RATE = 9600;
+
+localparam COUNT_MAX = CLK_FREQ / BAUD_RATE;
+reg [31:0] count;
+always @(posedge clk or posedge rst) begin
+
+if (rst) begin
+        count <= 0;
+        baud_tick <= 0;
+    end
+    else begin
+        if (count == COUNT_MAX-1) begin
+            count <= 0;
+            baud_tick <= 1;
+        end
+        else begin
+            count <= count + 1;
+            baud_tick <= 0;
+        end
+    end
+end
+endmodule
