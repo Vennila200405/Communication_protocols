@@ -1,0 +1,146 @@
+module apb_master #(
+    parameter ADDR_WIDTH = 32,
+    parameter DATA_WIDTH = 32
+)(
+    input PCLK,
+    input PRESETn,
+
+    input transfer,
+    input write_read,
+    input  [ADDR_WIDTH-1:0]     addr_in,
+    input  [DATA_WIDTH-1:0]     data_in,
+
+    input PREADY,
+    input  [DATA_WIDTH-1:0]     PRDATA,
+
+    output reg PSEL,
+    output reg PENABLE,
+    output reg PWRITE,
+    output reg [ADDR_WIDTH-1:0] PADDR,
+    output reg [DATA_WIDTH-1:0] PWDATA,
+
+    output reg [DATA_WIDTH-1:0] data_out,
+    output reg ready_out
+);
+
+localparam IDLE   = 2'b00;
+localparam SETUP  = 2'b01;
+localparam ACCESS = 2'b10;
+
+reg [1:0] current_state,next_state;
+
+always @(posedge PCLK or negedge PRESETn)
+begin
+    if(!PRESETn)
+        current_state <= IDLE;
+    else
+        current_state <= next_state;
+end
+
+
+always @(*)
+begin
+
+    case(current_state)
+
+    IDLE:
+        if(transfer)
+            next_state = SETUP;
+        else
+            next_state = IDLE;
+
+    SETUP:
+        next_state = ACCESS;
+
+    ACCESS:
+    begin
+        if(PREADY)
+        begin
+            if(transfer)
+                next_state = SETUP;
+            else
+                next_state = IDLE;
+        end
+        else
+            next_state = ACCESS;
+    end
+
+    default:
+        next_state = IDLE;
+
+    endcase
+
+end
+
+always @(posedge PCLK or negedge PRESETn)
+begin
+
+    if(!PRESETn)
+    begin
+
+        PSEL      <=0;
+        PENABLE   <=0;
+        PWRITE    <=0;
+        PADDR     <=0;
+        PWDATA    <=0;
+        ready_out <=0;
+        data_out  <=0;
+
+    end
+
+    else
+    begin
+
+        ready_out <=0;
+
+        case(current_state)
+
+        IDLE:
+        begin
+            PSEL<=0;
+            PENABLE<=0;
+        end
+
+        SETUP:
+        begin
+            PSEL<=1;
+            PENABLE<=0;
+
+            PADDR<=addr_in;
+            PWRITE<=write_read;
+
+            if(write_read)
+                PWDATA<=data_in;
+        end
+
+        ACCESS:
+        begin
+
+            PSEL<=1;
+            PENABLE<=1;
+
+            if(PREADY)
+            begin
+
+                ready_out<=1;
+
+                if(!PWRITE)
+                    data_out<=PRDATA;
+
+                if(!transfer)
+                begin
+                    PSEL<=0;
+                    PENABLE<=0;
+                end
+
+            end
+
+        end
+
+        endcase
+
+    end
+
+end
+
+endmodule
